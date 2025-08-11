@@ -55,10 +55,18 @@ class SingleMarketSolver:
         model = pe.ConcreteModel()
         model.T = pe.RangeSet(0, len(data.index) - 1)
 
-        model.ca = pe.Param(model.T, initialize=data['LT_mfrr_SA_down_activ'].to_dict())
-        model.da = pe.Param(model.T, initialize=data['LT_mfrr_SA_up_activ'].to_dict())
-        model.cp = pe.Param(model.T, initialize=data['LT_down_sa_cbmp'].to_dict())
-        model.dp = pe.Param(model.T, initialize=data['LT_up_sa_cbmp'].to_dict())
+        model.ca = pe.Param(model.T, initialize={
+            i: data.iloc[i]['LT_mfrr_SA_down_activ'] for i in range(n_intervals)
+        })
+        model.da = pe.Param(model.T, initialize={
+            i: data.iloc[i]['LT_mfrr_SA_up_activ'] for i in range(n_intervals)
+        })
+        model.cp = pe.Param(model.T, initialize={
+            i: data.iloc[i]['LT_down_sa_cbmp'] for i in range(n_intervals)
+        })
+        model.dp = pe.Param(model.T, initialize={
+            i: data.iloc[i]['LT_up_sa_cbmp'] for i in range(n_intervals)
+        })
 
         model.charge = pe.Var(model.T, within=pe.Binary)
         model.discharge = pe.Var(model.T, within=pe.Binary)
@@ -108,7 +116,7 @@ class SingleMarketSolver:
             print(f"Total profit: {total_profit:.2f} EUR")
         return self
     
-    def _maximise_profit(self, m):
+    def _maximize_profit(self, m):
 
         return sum(
             m.discharge[t] * self.energy_per_interval * m.dp[t] - 
