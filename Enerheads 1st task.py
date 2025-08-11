@@ -44,7 +44,7 @@ if price_data in ["nord pool", "nordpool", "nord"]:
         ],
         how='inner'
     )
-    
+    df = df.ffill().bfill()
     
 elif price_data in ["mfrr", "m frr"]:
     price_column = "LT_up_sa_cbmp"
@@ -64,8 +64,6 @@ elif price_data in ["mfrr", "m frr"]:
 
     df = filtered_market.join(shifted_factor, how='inner')
     df = df.ffill().bfill()
-    # df = df.fillna(method='ffill')
-    # df = df.fillna(method='bfill')
 
 else:
     raise ValueError("Invalid input: choose 'Nord Pool' or 'mFRR'")
@@ -176,7 +174,7 @@ def evaluate_price_extremes(y_actual, y_pred, timestamps, spread_threshold=200):
         pred_min_time = day_data.loc[day_data['predicted'].idxmin(), 'timestamp']
         pred_max_time = day_data.loc[day_data['predicted'].idxmax(), 'timestamp']
         
-        if abs((actual_min_time - pred_min_time).total_seconds()) <= 7200:  # 2 hours
+        if abs((actual_min_time - pred_min_time).total_seconds()) <= 7200:
             min_correct += 1
         if abs((actual_max_time - pred_max_time).total_seconds()) <= 7200:
             max_correct += 1
@@ -201,7 +199,7 @@ def evaluate_price_extremes(y_actual, y_pred, timestamps, spread_threshold=200):
     print(f"  Min price timing accuracy: {min_accuracy:.1%}")
     print(f"  Max price timing accuracy: {max_accuracy:.1%}")
     
-    print(f"\nHigh Spreads (>{spread_threshold} EUR/MWh):")
+    print(f"\nHigh Spreads (>{spread_threshold}):")
     print(f"  Actual high-spread days: {actual_high_spreads}/{total_days}")
     print(f"  Correctly identified: {correctly_identified}")
     print(f"  Precision: {precision:.1%}")
@@ -224,8 +222,8 @@ def evaluate_and_forecast():
     test_rmse = root_mean_squared_error(y_test_actual, y_test_pred)
     
     print(f"\nModel Performance:")
-    print(f"Train RMSE: {train_rmse:.2f} EUR/MWh")
-    print(f"Test RMSE: {test_rmse:.2f} EUR/MWh")
+    print(f"Train RMSE: {train_rmse:.2f}")
+    print(f"Test RMSE: {test_rmse:.2f}")
     
     test_start_idx = len(df) - len(y_test_actual)
     test_timestamps = df.index[test_start_idx:test_start_idx + len(y_test_actual)]
@@ -258,7 +256,7 @@ def create_visualizations():
     axes[0].plot(test_dates, y_test_pred.flatten(), 'g--', label='Predicted', linewidth=2)
     axes[0].set_title('Model Performance on Test Set')
     axes[0].set_xlabel('Date')
-    axes[0].set_ylabel('Price (EUR/MWh)')
+    axes[0].set_ylabel('Result')
     axes[0].legend()
     axes[0].grid(True, alpha=0.3)
     
@@ -267,7 +265,7 @@ def create_visualizations():
     axes[1].axhline(test_rmse, color='blue', linestyle='--', label=f'RMSE: {test_rmse:.2f}')
     axes[1].set_title('Prediction Errors')
     axes[1].set_xlabel('Date')
-    axes[1].set_ylabel('Error (EUR/MWh)')
+    axes[1].set_ylabel('Error')
     axes[1].legend()
     axes[1].grid(True, alpha=0.3)
     
@@ -278,7 +276,7 @@ def create_visualizations():
     axes[2].axvline(df.index[-1], color='gray', linestyle='--', alpha=0.7)
     axes[2].set_title('Historical Data and 24-Hour Forecast')
     axes[2].set_xlabel('Date')
-    axes[2].set_ylabel('Price (EUR/MWh)')
+    axes[2].set_ylabel('Result')
     axes[2].legend()
     axes[2].grid(True, alpha=0.3)
     
@@ -286,10 +284,10 @@ def create_visualizations():
     plt.show()
     
     print(f"\n24-Hour Forecast Summary:")
-    print(f"Average price: {np.mean(future_prices):.2f} EUR/MWh")
-    print(f"Min price: {np.min(future_prices):.2f} EUR/MWh")
-    print(f"Max price: {np.max(future_prices):.2f} EUR/MWh")
-    print(f"Price volatility (std): {np.std(future_prices):.2f} EUR/MWh")
+    print(f"Average price: {np.mean(future_prices):.2f}")
+    print(f"Min price: {np.min(future_prices):.2f}")
+    print(f"Max price: {np.max(future_prices):.2f}")
+    print(f"Price volatility (std): {np.std(future_prices):.2f}")
 
 create_visualizations()
 
