@@ -89,7 +89,7 @@ class SingleMarketSolver:
 
             solver = pe.SolverFactory('glpk', executable=r"C:\Users\Vartotojas\Downloads\winglpk-4.65\glpk-4.65\w64\glpsol.exe")
             solver.options['mipgap'] = 0.01 
-            results = solver.solve(self.model, tee=True)
+            results = solver.solve(self.model, tee=False)
             print(results.solver.status, results.solver.termination_condition)
             
             res = []
@@ -157,6 +157,35 @@ class SingleMarketSolver:
         return m.charge[t] + m.discharge[t] <= 1     
 
 test_data = df.head(96)
+
+solver = SingleMarketSolver(
+    battery_power_mw=1,
+    battery_capacity_mwh=2, 
+    max_cycles_per_day=2,
+    initial_soc=1
+)
+
+def find_optimal_horizon(df):
+    horizons = [24, 25, 26, 30, 36, 48]
+    best_profit_per_hour = 0
+    best_intervals = 96
+    
+    for hours in horizons:
+        intervals = int(hours * 4) 
+        if intervals <= len(df):
+            test_data = df.head(intervals)
+            solver = SingleMarketSolver(1, 2, 2, 1)
+            solver.define(test_data).solve()
+            if solver.output:
+                profit_per_hour = solver.total_profit / hours
+                if profit_per_hour > best_profit_per_hour:
+                    best_profit_per_hour = profit_per_hour
+                    best_intervals = intervals
+    return best_intervals
+
+optimal_intervals = find_optimal_horizon(df)
+test_data = df.head(optimal_intervals)
+print(f"Using {optimal_intervals/4:.0f} hour horizon ({optimal_intervals} intervals)")
 
 solver = SingleMarketSolver(
     battery_power_mw=1,
