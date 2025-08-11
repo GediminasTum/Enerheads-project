@@ -77,7 +77,8 @@ class SingleMarketSolver:
         model.charge_activation = pe.Constraint(model.T, rule=self._charge_activation_con)
         model.discharge_activation = pe.Constraint(model.T, rule=self._discharge_activation_con)
         model.cycle_constraint = pe.Constraint(rule=self._cycle_con)
-        model.soc_evolution = pe.Constraint(model.T, rule=self._soc_evolution_con)
+        model.soc_evolution = pe.Constraint(model.T, rule=self._soc_evaluation_con)
+        model.no_simultaneous = pe.Constraint(model.T, rule=self._no_simultaneous_con)
 
         self.model = model
         return self
@@ -124,15 +125,65 @@ class SingleMarketSolver:
             for t in m.T
         )
 
-    def _example_constr(self, m, t):
-        '''
-        This is an example constraint, pyomo passes model object (m) and model timestep index (t)
-        '''
-        # Allow charging only if the system has a down activation.
-        return m.charge[t] <= m.ca[t]
-        
-    def _some_constraint(self, m, t):
-        '''
-        Some other constraint
-        '''    
+    def _charge_activation_con(self, m, t):
+        return m.charge[t] <= (1 if pe.value(m.ca[t]) > 0 else 0)
+    
+    def _discharge_activation_con(self, m, t):
+        return m.discharge[t] <= (1 if pe.value(m.da[t]) > 0 else 0)
+    def _soc_evaluation_con(self, m, t):
+        if t == 0:
+            return m.soc[t] == (self.initial_soc + 
+                               m.charge[t] * self.energy_per_interval - 
+                               m.discharge[t] * self.energy_per_interval)
+        else:
 
+            return m.soc[t] == (m.soc[t-1] + 
+                               m.charge[t] * self.energy_per_interval - 
+                               m.discharge[t] * self.energy_per_interval) 
+
+    
+    def _cycle_con (self, m):
+        total_throughput = sum(
+            (m.charge[t] + m.discharge[t]) * self.energy_per_interval 
+            for t in m.T
+        )
+        
+        optimization_days = len(m.T) / self.intervals_per_day
+        max_allowed_energy = optimization_days * self.max_energy_per_day
+        
+        return total_throughput <= max_allowed_energy   
+
+    def _no_simultaneous_con(self, m, t):
+        return m.charge[t] + m.discharge[t] <= 1     
+
+test_data = df.head(96)
+
+solver = SingleMarketSolver(
+    battery_power_mw=1,
+    battery_capacity_mwh=2, 
+    max_cycles_per_day=2,
+    initial_soc=1
+)
+
+try:
+    solver.define(test_data)
+    solver.solve()
+    
+    if solver.output:
+        print(f"Results summary:")
+        print(f"Total profit: {solver.total_profit:.2f} EUR")
+        
+        charges = sum(r['charge'] for r in solver.output)
+        discharges = sum(r['discharge'] for r in solver.output)
+        print(f"Charge events: {charges}")
+        print(f"Discharge events: {discharges}")
+        print(f"Total energy throughput: {(charges + discharges) * 0.25:.2f} MWh")
+        
+        final_soc = solver.output[-1]['soc']
+        print(f"Final SOC: {final_soc:.2f} MWh")
+        
+    else:
+        print("Solver failed - no output generated")
+        
+except Exception as e:
+    print(f"Error running solver: {e}")
